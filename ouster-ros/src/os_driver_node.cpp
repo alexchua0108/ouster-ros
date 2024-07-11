@@ -38,6 +38,7 @@ class OusterDriver : public OusterSensor {
         declare_parameter("scan_ring", 0);
         declare_parameter("ptp_utc_tai_offset", -37.0);
         declare_parameter("point_type", "original");
+        declare_parameter("selected_beams", std::vector<int>{0,1,2,63,64,65,95,96}); // // Add parameter for selected beams
     }
 
     ~OusterDriver() override {
@@ -74,22 +75,42 @@ class OusterDriver : public OusterSensor {
         }
 
         int num_returns = get_n_returns(info);
+        auto selected_beams_param = get_parameter("selected_beams").as_integer_array();
+        selected_beams_.assign(selected_beams_param.begin(), selected_beams_param.end());
+        for (auto beam : selected_beams_) {
+            std::cout << "Selected beams: " << beam << std::endl;
+        }
 
         std::vector<LidarScanProcessor> processors;
         if (impl::check_token(tokens, "PCL")) {
             lidar_pubs.resize(num_returns);
+            selected_beam_pub.resize(num_returns);
             for (int i = 0; i < num_returns; ++i) {
                 lidar_pubs[i] = create_publisher<sensor_msgs::msg::PointCloud2>(
                     topic_for_return("points", i), selected_qos);
+                selected_beam_pub[i] = create_publisher<sensor_msgs::msg::PointCloud2>(
+                    topic_for_return("selected_beams", i), selected_qos);       // Add publisher for selected beams
             }
-
+            std::vector<int> empty_vector{};
             auto point_type = get_parameter("point_type").as_string();
             processors.push_back(
                 PointCloudProcessorFactory::create_point_cloud_processor(point_type, info,
                     tf_bcast.point_cloud_frame_id(), tf_bcast.apply_lidar_to_sensor_transform(),
                     [this](PointCloudProcessor_OutputType msgs) {
                         for (size_t i = 0; i < msgs.size(); ++i) lidar_pubs[i]->publish(*msgs[i]);
-                    }
+                    },
+                    empty_vector
+                )
+            );
+
+            // create processors to publish selected beams
+            processors.push_back(
+                PointCloudProcessorFactory::create_point_cloud_processor(point_type, info,
+                    tf_bcast.point_cloud_frame_id(), tf_bcast.apply_lidar_to_sensor_transform(),
+                    [this](PointCloudProcessor_OutputType msgs) {
+                        for (size_t i = 0; i < msgs.size(); ++i) selected_beam_pub[i]->publish(*msgs[i]);
+                    },
+                    selected_beams_ // Pass selected_beams parameter
                 )
             );
 
@@ -200,6 +221,8 @@ class OusterDriver : public OusterSensor {
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub;
     std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr>
         lidar_pubs;
+    std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr>
+        selected_beam_pub;
     std::vector<rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr>
         scan_pubs;
     std::map<sensor::ChanField,
@@ -207,6 +230,7 @@ class OusterDriver : public OusterSensor {
         image_pubs;
     ImuPacketHandler::HandlerType imu_packet_handler;
     LidarPacketHandler::HandlerType lidar_packet_handler;
+    std::vector<int> selected_beams_;
 };
 
 }  // namespace ouster_ros

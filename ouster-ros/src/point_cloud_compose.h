@@ -120,11 +120,15 @@ void scan_to_cloud_f_destaggered(ouster_ros::Cloud<PointT>& cloud,
                                  PointS& staging_point,
                                  const ouster::PointsF& points,
                                  uint64_t scan_ts, const ouster::LidarScan& ls,
-                                 const std::vector<int>& pixel_shift_by_row) {
+                                 const std::vector<int>& pixel_shift_by_row,
+                                 const std::vector<int>& selected_beams = {}) {
     auto ls_tuple = make_lidar_scan_tuple<0, N, PROFILE>(ls);
     auto timestamp = ls.timestamp();
 
     for (auto u = 0; u < ls.h; u++) {
+        if (!selected_beams.empty() && std::find(selected_beams.begin(), selected_beams.end(), u) == selected_beams.end()) {
+            continue; // Skip this beam if it's not in the selected_beams list
+        }
         for (auto v = 0; v < ls.w; v++) {
             const auto v_shift = (v + ls.w - pixel_shift_by_row[u]) % ls.w;
             auto ts = timestamp[v_shift];

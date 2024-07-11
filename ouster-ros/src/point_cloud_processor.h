@@ -33,20 +33,23 @@ class PointCloudProcessor {
                                         const ouster::PointsF& points,
                                         uint64_t scan_ts, const ouster::LidarScan& ls,
                                         const std::vector<int>& pixel_shift_by_row,
-                                        int return_index)>;
+                                        int return_indexm,
+                                        const std::vector<int>& selected_beams)>; // Add selected_beams parameter)
 
    public:
     PointCloudProcessor(const ouster::sensor::sensor_info& info,
                         const std::string& frame_id,
                         bool apply_lidar_to_sensor_transform,
                         ScanToCloudFn scan_to_cloud_fn_,
-                        PointCloudProcessor_PostProcessingFn post_processing_fn_)
+                        PointCloudProcessor_PostProcessingFn post_processing_fn_,
+                        std::vector<int>& selected_beams) // Add selected_beams parameter
         : frame(frame_id),
           pixel_shift_by_row(info.format.pixel_shift_by_row),
           cloud{info.format.columns_per_frame, info.format.pixels_per_column},
           pc_msgs(get_n_returns(info)),
           scan_to_cloud_fn(scan_to_cloud_fn_),
-          post_processing_fn(post_processing_fn_) {
+          post_processing_fn(post_processing_fn_),
+          selected_beams_(selected_beams) { // Add selected_beams parameter
         for (size_t i = 0; i < pc_msgs.size(); ++i)
             pc_msgs[i] = std::make_shared<sensor_msgs::msg::PointCloud2>();
         ouster::mat4d additional_transform =
@@ -83,7 +86,7 @@ class PointCloudProcessor {
                                std::numeric_limits<float>::quiet_NaN());
 
             scan_to_cloud_fn(cloud, points, scan_ts, lidar_scan,
-                                        pixel_shift_by_row, i);
+                                        pixel_shift_by_row, i, selected_beams_);  // Pass selected_beams
 
             pcl_toROSMsg(cloud, *pc_msgs[i]);
             pc_msgs[i]->header.stamp = msg_ts;
@@ -98,9 +101,10 @@ class PointCloudProcessor {
                                      const std::string& frame,
                                      bool apply_lidar_to_sensor_transform,
                                      ScanToCloudFn scan_to_cloud_fn_,
-                                     PointCloudProcessor_PostProcessingFn post_processing_fn) {
+                                     PointCloudProcessor_PostProcessingFn post_processing_fn,
+                                     std::vector<int>& selected_beams) { // Add selected beam
         auto handler = std::make_shared<PointCloudProcessor>(
-            info, frame, apply_lidar_to_sensor_transform, scan_to_cloud_fn_, post_processing_fn);
+            info, frame, apply_lidar_to_sensor_transform, scan_to_cloud_fn_, post_processing_fn, selected_beams); // Add selected beam
 
         return [handler](const ouster::LidarScan& lidar_scan, uint64_t scan_ts,
                          const rclcpp::Time& msg_ts) {
@@ -123,6 +127,7 @@ class PointCloudProcessor {
     PointCloudProcessor_OutputType pc_msgs;
     ScanToCloudFn scan_to_cloud_fn;
     PointCloudProcessor_PostProcessingFn post_processing_fn;
+    std::vector<int> selected_beams_; // Store selected beams
 };
 
 }  // namespace ouster_ros

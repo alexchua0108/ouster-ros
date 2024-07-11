@@ -109,14 +109,15 @@ class OusterCloud : public OusterProcessingNodeBase {
                 lidar_pubs[i] = create_publisher<sensor_msgs::msg::PointCloud2>(
                     topic_for_return("points", i), selected_qos);
             }
-
+            std::vector<int> empty_vector{};
             auto point_type = get_parameter("point_type").as_string();
             processors.push_back(
                 PointCloudProcessorFactory::create_point_cloud_processor(point_type, info,
                     tf_bcast.point_cloud_frame_id(), tf_bcast.apply_lidar_to_sensor_transform(),
                     [this](PointCloudProcessor_OutputType msgs) {
                         for (size_t i = 0; i < msgs.size(); ++i) lidar_pubs[i]->publish(*msgs[i]);
-                    }
+                    },
+                    empty_vector
                 )
             );
 

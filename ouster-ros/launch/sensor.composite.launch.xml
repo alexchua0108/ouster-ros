@@ -73,6 +73,9 @@
     xyzir
     }"/>
 
+  <arg name="selected_beams" default="[0,1,2]" description="
+    using this parameter to use to the ring to display as pointcloud"/>
+
   <group>
     <push-ros-namespace namespace="$(var ouster_ns)"/>
     <node pkg="ouster_ros" exec="os_driver" name="os_driver" output="screen">
@@ -95,6 +98,7 @@
       <param name="proc_mask" value="$(var proc_mask)"/>
       <param name="scan_ring" value="$(var scan_ring)"/>
       <param name="point_type" value="$(var point_type)"/>
+      <param name="selected_beams" value="$(var selected_beams)"/> 
     </node>
   </group>
 
